@@ -6,34 +6,36 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
 using Microsoft.EntityFrameworkCore;
 using UdemyRealWorldUnitTest.Web.Models;
-using UdemyRealWorldUnitTest.Web.Repository;
 
 namespace UdemyRealWorldUnitTest.Web.Controllers
 {
     public class ProductsController : Controller
     {
-        private readonly IRepository<Product> _repository;
+        private readonly UdemyUnitTestDbContext _context;
 
-        public ProductsController(IRepository<Product> repository)
+        public ProductsController(UdemyUnitTestDbContext context)
         {
-            _repository = repository;
+            _context = context;
         }
 
         // GET: Products
         public async Task<IActionResult> Index()
         {
-            return View(await _repository.GetAll());
+            var udemyUnitTestDbContext = _context.Products.Include(p => p.Category);
+            return View(await udemyUnitTestDbContext.ToListAsync());
         }
 
         // GET: Products/Details/5
         public async Task<IActionResult> Details(int? id)
         {
-            if (id == null)
+            if (id == null || _context.Products == null)
             {
-                return RedirectToAction("Index");
+                return NotFound();
             }
 
-            var product = await _repository.GetById((int)id);
+            var product = await _context.Products
+                .Include(p => p.Category)
+                .FirstOrDefaultAsync(m => m.Id == id);
             if (product == null)
             {
                 return NotFound();
@@ -45,6 +47,7 @@ namespace UdemyRealWorldUnitTest.Web.Controllers
         // GET: Products/Create
         public IActionResult Create()
         {
+            ViewData["CategoryId"] = new SelectList(_context.Categories, "Id", "Name");
             return View();
         }
 
@@ -53,29 +56,32 @@ namespace UdemyRealWorldUnitTest.Web.Controllers
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create([Bind("Id,Name,Price,Stock,Color")] Product product)
+        public async Task<IActionResult> Create([Bind("Id,Name,Price,Stock,Color,CategoryId")] Product product)
         {
             if (ModelState.IsValid)
             {
-                await _repository.Create(product);
+                _context.Add(product);
+                await _context.SaveChangesAsync();
                 return RedirectToAction(nameof(Index));
             }
+            ViewData["CategoryId"] = new SelectList(_context.Categories, "Id", "Name", product.CategoryId);
             return View(product);
         }
 
         // GET: Products/Edit/5
         public async Task<IActionResult> Edit(int? id)
         {
-            if (id == null)
+            if (id == null || _context.Products == null)
             {
-                return RedirectToAction("Index");
+                return NotFound();
             }
 
-            var product = await _repository.GetById((int)id);
+            var product = await _context.Products.FindAsync(id);
             if (product == null)
             {
                 return NotFound();
             }
+            ViewData["CategoryId"] = new SelectList(_context.Categories, "Id", "Name", product.CategoryId);
             return View(product);
         }
 
@@ -84,31 +90,48 @@ namespace UdemyRealWorldUnitTest.Web.Controllers
         // For more details, see http://go.microsoft.com/fwlink/?LinkId=317598.
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public IActionResult Edit(int id, [Bind("Id,Name,Price,Stock,Color")] Product product)
+        public async Task<IActionResult> Edit(int id, [Bind("Id,Name,Price,Stock,Color,CategoryId")] Product product)
         {
             if (id != product.Id)
             {
                 return NotFound();
-
             }
 
             if (ModelState.IsValid)
             {
-                _repository.Update(product);
+                try
+                {
+                    _context.Update(product);
+                    await _context.SaveChangesAsync();
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    if (!ProductExists(product.Id))
+                    {
+                        return NotFound();
+                    }
+                    else
+                    {
+                        throw;
+                    }
+                }
                 return RedirectToAction(nameof(Index));
             }
+            ViewData["CategoryId"] = new SelectList(_context.Categories, "Id", "Name", product.CategoryId);
             return View(product);
         }
 
         // GET: Products/Delete/5
         public async Task<IActionResult> Delete(int? id)
         {
-            if (id == null)
+            if (id == null || _context.Products == null)
             {
                 return NotFound();
             }
 
-            var product = await _repository.GetById((int)id);
+            var product = await _context.Products
+                .Include(p => p.Category)
+                .FirstOrDefaultAsync(m => m.Id == id);
             if (product == null)
             {
                 return NotFound();
@@ -122,23 +145,23 @@ namespace UdemyRealWorldUnitTest.Web.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
-
-            var product = await _repository.GetById(id);
-            _repository.Delete(product);
+            if (_context.Products == null)
+            {
+                return Problem("Entity set 'UdemyUnitTestDbContext.Products'  is null.");
+            }
+            var product = await _context.Products.FindAsync(id);
+            if (product != null)
+            {
+                _context.Products.Remove(product);
+            }
+            
+            await _context.SaveChangesAsync();
             return RedirectToAction(nameof(Index));
         }
 
-        public bool ProductExists(int id)
+        private bool ProductExists(int id)
         {
-            var product = _repository.GetById(id).Result;
-            if (product == null)
-            {
-                return false;
-            }
-            else
-            {
-                return true;
-            }
+          return (_context.Products?.Any(e => e.Id == id)).GetValueOrDefault();
         }
     }
 }

@@ -16,6 +16,7 @@ public partial class UdemyUnitTestDbContext : DbContext
     }
 
     public virtual DbSet<Product> Products { get; set; }
+    public virtual DbSet<Category> Categories { get; set; }
 
 
 
@@ -29,6 +30,15 @@ public partial class UdemyUnitTestDbContext : DbContext
             entity.Property(e => e.Name).HasMaxLength(200);
             entity.Property(e => e.Price).HasColumnType("decimal(18, 2)");
         });
+        //modelBuilder.Entity<Category>().HasData(new Category
+        //{ Id = 1, Name = "Kalemler" },
+        //new Category { Id = 2, Name = "Defterler" }
+        //);
+
+
+
+
+
 
         OnModelCreatingPartial(modelBuilder);
     }

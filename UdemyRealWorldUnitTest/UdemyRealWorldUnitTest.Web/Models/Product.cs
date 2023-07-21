@@ -19,4 +19,8 @@ public partial class Product
 
     [Required]
     public string? Color { get; set; }
+
+    public int CategoryId { get; set; }
+
+    public virtual Category? Category { get; set; }
 }
